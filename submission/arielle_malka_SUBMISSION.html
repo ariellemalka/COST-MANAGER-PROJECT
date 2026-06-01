@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>arielle_malka - Cost Manager Submission</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.5; }
+h1, h2, h3 { color: #222; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th, td { border: 1px solid #333; padding: 8px; text-align: right; }
+.cover-en { direction: ltr; text-align: left; }
+a { color: #0645ad; }
+pre { font-family: Consolas, monospace; font-size: 9pt; background: #f5f5f5; padding: 12px; white-space: pre-wrap; word-wrap: break-word; border: 1px solid #ccc; page-break-inside: avoid; }
+.file-title { background: #e8e8e8; padding: 8px; font-weight: bold; margin-top: 24px; direction: ltr; text-align: left; }
+.page-break { page-break-before: always; }
+.small { font-size: 10pt; color: #444; }
+</style>
+</head>
+<body>
+
+<h1>פרויקט גמר – Cost Manager RESTful Web Services</h1>
+<p><strong>קורס:</strong> פיתוח צד שרת אסינכרוני</p>
+
+<h2>מנהלת צוות (מגישה ל-Moodle)</h2>
+<p><strong>אריאל מלכה</strong> (Arielle Malka)</p>
+<p class="small">שם קובץ PDF להגשה: <strong>arielle_malka.pdf</strong></p>
+
+<h2>חברי צוות</h2>
+<table>
+<tr><th>#</th><th>שם פרטי</th><th>שם משפחה</th><th>ת.ז.</th><th>נייד</th><th>אימייל</th></tr>
+<tr><td>1</td><td>Arielle</td><td>Malka</td><td>207374083</td><td></td><td>arielle0209@gmail.com</td></tr>
+<tr><td>2</td><td>Matan</td><td>Owadeyah</td><td>322659079</td><td></td><td>matan60003@gmail.com</td></tr>
+</table>
+<p class="small">(ניתן למלא עמודת נייד לפני שמירה כ-PDF)</p>
+
+<h2>סרטון הדגמה (YouTube – Unlisted)</h2>
+<p><a href="https://youtu.be/ZuppCvTG9pc">https://youtu.be/ZuppCvTG9pc</a></p>
+
+<h2>סיכום שימוש בכלי שיתוף (עד 100 מילים)</h2>
+<p>השתמשנו ב-Cursor לפיתוח ארבעת שירותי Express ב-JavaScript ולהרצת בדיקות. תיאמנו ב-Zoom חלוקת משימות ופתרון באגים. MongoDB Atlas שימש מסד ענן משותף לכל ה-processes. העלינו ל-YouTube סרטון Unlisted שמדגים את test_project.py עם תשובות 200 ו-201. כך עמדנו בדרישות המרצה.</p>
+
+<h2>תיאור הפרויקט</h2>
+<ul>
+<li>4 processes נפרדים: logs (a), users (b), costs (c), about (d)</li>
+<li>MongoDB Atlas: users, costs, logs, reports (Computed Pattern)</li>
+<li>Node.js, Express, Mongoose, Pino</li>
+</ul>
+
+<h2>תוצאות בדיקות</h2>
+<table>
+<tr><th>בדיקה</th><th>תוצאה</th></tr>
+<tr><td>npm test</td><td>Unit tests – pass</td></tr>
+<tr><td>GET /api/about/</td><td>200</td></tr>
+<tr><td>GET /api/report (חודש 1/2026)</td><td>200</td></tr>
+<tr><td>POST /api/add (cost)</td><td>201</td></tr>
+<tr><td>GET /api/report (חודש 5/2026)</td><td>200</td></tr>
+</table>
+<p>פלט מלא: output.txt (ב-ZIP)</p>
+
+<div class="page-break"></div>
+<h1 class="cover-en">Source Code – All JavaScript Files</h1>
+<p class="cover-en small">Per course requirements: filename shown before each file.</p>
+<div class="file-title">FILE: load-root-env.js</div>
+<pre>const path = require(&#x27;path&#x27;);
+const dotenv = require(&#x27;dotenv&#x27;);
+
+const ROOT_ENV_PATH = path.join(__dirname, &#x27;.env&#x27;);
+
+function loadRootEnv() {
+  return dotenv.config({ path: ROOT_ENV_PATH });
+}
+
+module.exports = { loadRootEnv, ROOT_ENV_PATH };
+</pre>
+<div class="file-title">FILE: scripts/get-mongo-uri.js</div>
+<pre>const fs = require(&#x27;fs&#x27;);
+const path = require(&#x27;path&#x27;);
+
+function getMongoUri() {
+  const file = path.join(__dirname, &#x27;..&#x27;, &#x27;.mongo-uri&#x27;);
+  if (fs.existsSync(file)) {
+    return fs.readFileSync(file, &#x27;utf8&#x27;).trim();
+  }
+  return process.env.MONGODB_URI || &#x27;mongodb://127.0.0.1:27017/cost_manager&#x27;;
+}
+
+module.exports = { getMongoUri };
+</pre>
+<div class="file-title">FILE: scripts/seed.js</div>
+<pre>/* Seeds the imaginary submission user (id 123123). */
+const { loadRootEnv } = require(&#x27;../load-root-env&#x27;);
+loadRootEnv();
+const mongoose = require(&#x27;mongoose&#x27;);
+const { getMongoUri } = require(&#x27;./get-mongo-uri&#x27;);
+
+const userSchema = new mongoose.Schema({
+  id: { type: Number, required: true, unique: true },
+  first_name: { type: String, required: true },
+  last_name: { type: String, required: true },
+  birthday: { type: Date, required: true }
+});
+
+async function main() {
+  const uri = getMongoUri();
+  await mongoose.connect(uri);
+  const User = mongoose.model(&#x27;users&#x27;, userSchema);
+
+  await User.deleteMany({});
+  await User.create({
+    id: 123123,
+    first_name: &#x27;mosh&#x27;,
+    last_name: &#x27;israeli&#x27;,
+    birthday: new Date(&#x27;1990-01-01&#x27;)
+  });
+
+  console.log(&#x27;Seeded user 123123 (mosh israeli)&#x27;);
+  await mongoose.disconnect();
+}
+
+main().catch((err) =&gt; {
+  console.error(err);
+  process.exit(1);
+});
+</pre>
+<div class="file-title">FILE: scripts/start-all.js</div>
+<pre>/* Starts all four microservices (requires MongoDB URI). */
+const { spawn } = require(&#x27;child_process&#x27;);
+const path = require(&#x27;path&#x27;);
+const { loadRootEnv } = require(&#x27;../load-root-env&#x27;);
+const { getMongoUri } = require(&#x27;./get-mongo-uri&#x27;);
+
+loadRootEnv();
+
+const services = [
+  { name: &#x27;logs&#x27;, dir: &#x27;logs-service&#x27;, port: process.env.LOGS_PORT || 3001 },
+  { name: &#x27;users&#x27;, dir: &#x27;users-service&#x27;, port: process.env.USERS_PORT || 3002 },
+  { name: &#x27;costs&#x27;, dir: &#x27;costs-service&#x27;, port: process.env.COSTS_PORT || 3003 },
+  { name: &#x27;about&#x27;, dir: &#x27;about-service&#x27;, port: process.env.ABOUT_PORT || 3004 }
+];
+
+const mongoUri = process.env.MONGODB_URI || getMongoUri();
+const children = [];
+
+function startService(service) {
+  const cwd = path.join(__dirname, &#x27;..&#x27;, &#x27;services&#x27;, service.dir);
+  const child = spawn(&#x27;node&#x27;, [&#x27;app.js&#x27;], {
+    cwd,
+    env: {
+      ...process.env,
+      MONGODB_URI: mongoUri,
+      PORT: String(service.port)
+    },
+    stdio: &#x27;inherit&#x27;
+  });
+  children.push(child);
+  console.log(`Started ${service.name} on port ${service.port}`);
+}
+
+services.forEach(startService);
+
+function shutdown() {
+  children.forEach((c) =&gt; c.kill(&#x27;SIGTERM&#x27;));
+  process.exit(0);
+}
+
+process.on(&#x27;SIGINT&#x27;, shutdown);
+process.on(&#x27;SIGTERM&#x27;, shutdown);
+</pre>
+<div class="file-title">FILE: scripts/start-mongo.js</div>
+<pre>/* Starts a local MongoDB instance for development (in-memory). */
+const fs = require(&#x27;fs&#x27;);
+const path = require(&#x27;path&#x27;);
+const { MongoMemoryServer } = require(&#x27;mongodb-memory-server&#x27;);
+
+const URI_FILE = path.join(__dirname, &#x27;..&#x27;, &#x27;.mongo-uri&#x27;);
+
+async function main() {
+  const mongod = await MongoMemoryServer.create();
+  const uri = mongod.getUri(&#x27;cost_manager&#x27;);
+  fs.writeFileSync(URI_FILE, uri, &#x27;utf8&#x27;);
+  console.log(&#x27;MongoDB ready:&#x27;, uri);
+  console.log(&#x27;URI written to&#x27;, URI_FILE);
+
+  const shutdown = async () =&gt; {
+    await mongod.stop();
+    if (fs.existsSync(URI_FILE)) {
+      fs.unlinkSync(URI_FILE);
+    }
+    process.exit(0);
+  };
+
+  process.on(&#x27;SIGINT&#x27;, shutdown);
+  process.on(&#x27;SIGTERM&#x27;, shutdown);
+}
+
+main().catch((err) =&gt; {
+  console.error(err);
+  process.exit(1);
+});
+</pre>
+<div class="file-title">FILE: services/about-service/app-bootstrap.js</div>
+<pre>const { connectDb } = require(&#x27;./utils/db&#x27;);
+
+let initialized = false;
+
+async function initApp() {
+  if (!initialized) {
+    await connectDb();
+    initialized = true;
+  }
+}
+
+module.exports = { initApp };
+</pre>
+<div class="file-title">FILE: services/about-service/app.js</div>
+<pre>const { loadRootEnv } = require(&#x27;../../load-root-env&#x27;);
+loadRootEnv();
+const express = require(&#x27;express&#x27;);
+const { connectDb } = require(&#x27;./utils/db&#x27;);
+const { sendError } = require(&#x27;./utils/errors&#x27;);
+const { requestLogger, logEndpointAccess } = require(&#x27;./utils/requestLogger&#x27;);
+const { getTeamMembers } = require(&#x27;./utils/team&#x27;);
+
+const app = express();
+const PORT = process.env.PORT || 3004;
+
+app.use(express.json());
+app.use(requestLogger(&#x27;about-service&#x27;));
+
+async function aboutHandler(req, res) {
+  try {
+    await logEndpointAccess(&#x27;about-service&#x27;, &#x27;/api/about&#x27;);
+    const team = getTeamMembers();
+    if (!team) {
+      return sendError(res, 500, 28, &#x27;team members configuration is invalid&#x27;);
+    }
+    return res.json(team);
+  } catch (err) {
+    return sendError(res, 500, 500, &#x27;failed to get team details&#x27;);
+  }
+}
+
+app.get([&#x27;/api/about&#x27;, &#x27;/api/about/&#x27;], aboutHandler);
+
+app.get(&#x27;/health&#x27;, (req, res) =&gt; {
+  res.json({ status: &#x27;ok&#x27;, service: &#x27;about-service&#x27; });
+});
+
+const { initApp } = require(&#x27;./app-bootstrap&#x27;);
+
+async function start() {
+  await initApp();
+  app.listen(PORT, () =&gt; {
+    console.log(`about-service listening on port ${PORT}`);
+  });
+}
+
+if (require.main === module) {
+  start().catch((err) =&gt; {
+    console.error(err);
+    process.exit(1);
+  });
+}
+
+module.exports = app;
+module.exports.initApp = require(&#x27;./app-bootstrap&#x27;).initApp;
+</pre>
+<div class="file-title">FILE: services/about-service/models/logs.js</div>
+<pre>const mongoose = require(&#x27;mongoose&#x27;);
+
+const logsSchema = new mongoose.Schema({
+  level: { type: String, required: true },
+  message: { type: String, required: true },
+  method: { type: String },
+  url: { type: String },
+  endpoint: { type: String },
+  time: { type: Date, default: Date.now }
+});
+
+module.exports = mongoose.model(&#x27;logs&#x27;, logsSchema);
+</pre>
+<div class="file-title">FILE: services/about-service/tests/about.test.js</div>
+<pre>const { describe, it, before, after } = require(&#x27;node:test&#x27;);
+const assert = require(&#x27;node:assert&#x27;);
+const request = require(&#x27;supertest&#x27;);
+const mongoose = require(&#x27;mongoose&#x27;);
+const { MongoMemoryServer } = require(&#x27;mongodb-memory-server&#x27;);
+
+let mongod;
+let app;
+
+before(async () =&gt; {
+  mongod = await MongoMemoryServer.create();
+  process.env.MONGODB_URI = mongod.getUri(&#x27;cost_manager&#x27;);
+  mongoose.models = {};
+  mongoose.modelSchemas = {};
+  delete require.cache[require.resolve(&#x27;../app&#x27;)];
+  const mod = require(&#x27;../app&#x27;);
+  await mod.initApp();
+  app = mod;
+});
+
+after(async () =&gt; {
+  await mongoose.disconnect();
+  await mongod.stop();
+});
+
+describe(&#x27;about-service&#x27;, () =&gt; {
+  it(&#x27;returns team on /api/about/&#x27;, async () =&gt; {
+    const res = await request(app).get(&#x27;/api/about/&#x27;);
+    assert.strictEqual(res.status, 200);
+    assert.ok(Array.isArray(res.body));
+    assert.ok(res.body[0].first_name);
+  });
+});
+</pre>
+<div class="file-title">FILE: services/about-service/utils/db.js</div>
+<pre>const mongoose = require(&#x27;mongoose&#x27;);
+const path = require(&#x27;path&#x27;);
+const fs = require(&#x27;fs&#x27;);
+
+function resolveMongoUri() {
+  if (process.env.MONGODB_URI) {
+    return process.env.MONGODB_URI;
+  }
+  const file = path.join(__dirname, &#x27;..&#x27;, &#x27;..&#x27;, &#x27;..&#x27;, &#x27;.mongo-uri&#x27;);
+  if (fs.existsSync(file)) {
+    return fs.readFileSync(file, &#x27;utf8&#x27;).trim();
+  }
+  return &#x27;mongodb://127.0.0.1:27017/cost_manager&#x27;;
+}
+
+async function connectDb() {
+  await mongoose.connect(resolveMongoUri());
+}
+
+module.exports = { connectDb };
+</pre>
+<div class="file-title">FILE: services/about-service/utils/errors.js</div>
+<pre>function sendError(res, statusCode, id, message) {
+  return res.status(statusCode).json({ id, message });
+}
+
+module.exports = { sendError };
+</pre>
+<div class="file-title">FILE: services/about-service/utils/requestLogger.js</div>
+<pre>const pino = require(&#x27;pino&#x27;);
+const Log = require(&#x27;../models/logs&#x27;);
+
+const logger = pino({ level: &#x27;info&#x27; });
+
+async function saveLog(entry) {
+  try {
+    await Log.create(entry);
+  } catch (err) {
+    logger.error({ err }, &#x27;failed to save log&#x27;);
+  }
+}
+
+function requestLogger(serviceName) {
+  return function logMiddleware(req, res, next) {
+    saveLog({
+      level: &#x27;info&#x27;,
+      message: `HTTP request received on ${serviceName}`,
+      method: req.method,
+      url: req.originalUrl,
+      endpoint: req.path,
+      time: new Date()
+    });
+    next();
+  };
+}
+
+async function logEndpointAccess(serviceName, endpointName) {
+  await saveLog({
+    level: &#x27;info&#x27;,
+    message: `Endpoint accessed: ${endpointName} on ${serviceName}`,
+    endpoint: endpointName,
+    time: new Date()
+  });
+}
+
+module.exports = { requestLogger, logEndpointAccess };
+</pre>
+<div class="file-title">FILE: services/about-service/utils/team.js</div>
+<pre>function getTeamMembers() {
+  if (process.env.TEAM_MEMBERS) {
+    try {
+      const parsed = JSON.parse(process.env.TEAM_MEMBERS);
+      if (Array.isArray(parsed)) {
+        return parsed.map((m) =&gt; ({
+          first_name: m.first_name,
+          last_name: m.last_name
+        }));
+      }
+    } catch (err) {
+      return null;
+    }
+  }
+  return [{ first_name: &#x27;mosh&#x27;, last_name: &#x27;israeli&#x27; }];
+}
+
+module.exports = { getTeamMembers };
+</pre>
+<div class="file-title">FILE: services/costs-service/app-bootstrap.js</div>
+<pre>const { connectDb } = require(&#x27;./utils/db&#x27;);
+
+let initialized = false;
+
+async function initApp() {
+  if (!initialized) {
+    await connectDb();
+    initialized = true;
+  }
+}
+
+module.exports = { initApp };
+</pre>
+<div class="file-title">FILE: services/costs-service/app.js</div>
+<pre>const { loadRootEnv } = require(&#x27;../../load-root-env&#x27;);
+loadRootEnv();
+const express = require(&#x27;express&#x27;);
+const User = require(&#x27;./models/users&#x27;);
+const Cost = require(&#x27;./models/costs&#x27;);
+const Report = require(&#x27;./models/reports&#x27;);
+const { connectDb } = require(&#x27;./utils/db&#x27;);
+const { sendError } = require(&#x27;./utils/errors&#x27;);
+const { requestLogger, logEndpointAccess } = require(&#x27;./utils/requestLogger&#x27;);
+const { validateAddCost, validateReportQuery } = require(&#x27;./utils/validateCost&#x27;);
+const { buildReport, isPastMonth } = require(&#x27;./utils/reportBuilder&#x27;);
+
+const app = express();
+const PORT = process.env.PORT || 3003;
+
+app.use(express.json());
+app.use(requestLogger(&#x27;costs-service&#x27;));
+
+app.post([&#x27;/api/add&#x27;, &#x27;/api/add/&#x27;], async (req, res) =&gt; {
+  try {
+    await logEndpointAccess(&#x27;costs-service&#x27;, &#x27;/api/add&#x27;);
+    const validationError = validateAddCost(req.body);
+    if (validationError) {
+      return sendError(res, 400, validationError.id, validationError.message);
+    }
+
+    const userId = Number(req.body.userid);
+    const user = await User.findOne({ id: userId });
+    if (!user) {
+      return sendError(res, 404, 26, `user with id ${userId} does not exist`);
+    }
+
+    const createdAt = req.body.created_at ? new Date(req.body.created_at) : new Date();
+    const cost = await Cost.create({
+      description: req.body.description,
+      category: req.body.category,
+      userid: userId,
+      sum: Number(req.body.sum),
+      created_at: createdAt
+    });
+
+    return res.status(201).json({
+      description: cost.description,
+      category: cost.category,
+      userid: cost.userid,
+      sum: cost.sum,
+      created_at: cost.created_at
+    });
+  } catch (err) {
+    return sendError(res, 500, 500, &#x27;failed to add cost item&#x27;);
+  }
+});
+
+app.get(&#x27;/api/report&#x27;, async (req, res) =&gt; {
+  try {
+    await logEndpointAccess(&#x27;costs-service&#x27;, &#x27;/api/report&#x27;);
+    const validationError = validateReportQuery(req.query);
+    if (validationError) {
+      return sendError(res, 400, validationError.id, validationError.message);
+    }
+
+    const userId = Number(req.query.id);
+    const year = Number(req.query.year);
+    const month = Number(req.query.month);
+
+    const user = await User.findOne({ id: userId });
+    if (!user) {
+      return sendError(res, 404, 27, `user with id ${userId} does not exist`);
+    }
+
+    // Computed pattern: return cached report for past months when available.
+    if (isPastMonth(year, month)) {
+      const cached = await Report.findOne({ userid: userId, year, month }).lean();
+      if (cached &amp;&amp; cached.report) {
+        return res.json(cached.report);
+      }
+    }
+
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 1);
+    const costs = await Cost.find({
+      userid: userId,
+      created_at: { $gte: start, $lt: end }
+    }).lean();
+
+    const report = buildReport(userId, year, month, costs);
+
+    if (isPastMonth(year, month)) {
+      await Report.findOneAndUpdate(
+        { userid: userId, year, month },
+        { report },
+        { upsert: true, new: true }
+      );
+    }
+
+    return res.json(report);
+  } catch (err) {
+    return sendError(res, 500, 500, &#x27;failed to generate report&#x27;);
+  }
+});
+
+app.get(&#x27;/health&#x27;, (req, res) =&gt; {
+  res.json({ status: &#x27;ok&#x27;, service: &#x27;costs-service&#x27; });
+});
+
+const { initApp } = require(&#x27;./app-bootstrap&#x27;);
+
+async function start() {
+  await initApp();
+  app.listen(PORT, () =&gt; {
+    console.log(`costs-service listening on port ${PORT}`);
+  });
+}
+
+if (require.main === module) {
+  start().catch((err) =&gt; {
+    console.error(err);
+    process.exit(1);
+  });
+}
+
+module.exports = app;
+module.exports.initApp = require(&#x27;./app-bootstrap&#x27;).initApp;
+</pre>
+<div class="file-title">FILE: services/costs-service/models/costs.js</div>
+<pre>const mongoose = require(&#x27;mongoose&#x27;);
+
+const costsSchema = new mongoose.Schema({
+  description: { type: String, required: true },
+  category: { type: String, required: true },
+  userid: { type: Number, required: true },
+  sum: { type: Number, required: true },
+  created_at: { type: Date, default: Date.now }
+});
+
+module.exports = mongoose.model(&#x27;costs&#x27;, costsSchema);
+</pre>
+<div class="file-title">FILE: services/costs-service/models/logs.js</div>
+<pre>const mongoose = require(&#x27;mongoose&#x27;);
+
+const logsSchema = new mongoose.Schema({
+  level: { type: String, required: true },
+  message: { type: String, required: true },
+  method: { type: String },
+  url: { type: String },
+  endpoint: { type: String },
+  time: { type: Date, default: Date.now }
+});
+
+module.exports = mongoose.model(&#x27;logs&#x27;, logsSchema);
+</pre>
+<div class="file-title">FILE: services/costs-service/models/reports.js</div>
+<pre>const mongoose = require(&#x27;mongoose&#x27;);
+
+/*
+ * Computed design pattern: cached monthly reports for past months.
+ * Each document stores the pre-built report JSON for a user/year/month.
+ */
+const reportsSchema = new mongoose.Schema({
+  userid: { type: Number, required: true },
+  year: { type: Number, required: true },
+  month: { type: Number, required: true },
+  report: { type: mongoose.Schema.Types.Mixed, required: true }
+});
+
+reportsSchema.index({ userid: 1, year: 1, month: 1 }, { unique: true });
+
+module.exports = mongoose.model(&#x27;reports&#x27;, reportsSchema);
+</pre>
+<div class="file-title">FILE: services/costs-service/models/users.js</div>
+<pre>const mongoose = require(&#x27;mongoose&#x27;);
+
+const usersSchema = new mongoose.Schema({
+  id: { type: Number, required: true, unique: true },
+  first_name: { type: String, required: true },
+  last_name: { type: String, required: true },
+  birthday: { type: Date, required: true }
+});
+
+module.exports = mongoose.model(&#x27;users&#x27;, usersSchema);
+</pre>
+<div class="file-title">FILE: services/costs-service/tests/costs.test.js</div>
+<pre>const { describe, it, before, after } = require(&#x27;node:test&#x27;);
+const assert = require(&#x27;node:assert&#x27;);
+const request = require(&#x27;supertest&#x27;);
+const mongoose = require(&#x27;mongoose&#x27;);
+const { MongoMemoryServer } = require(&#x27;mongodb-memory-server&#x27;);
+
+let mongod;
+let app;
+
+before(async () =&gt; {
+  mongod = await MongoMemoryServer.create();
+  process.env.MONGODB_URI = mongod.getUri(&#x27;cost_manager&#x27;);
+  mongoose.models = {};
+  mongoose.modelSchemas = {};
+  delete require.cache[require.resolve(&#x27;../app&#x27;)];
+  const mod = require(&#x27;../app&#x27;);
+  await mod.initApp();
+  app = mod;
+  const User = require(&#x27;../models/users&#x27;);
+  await User.create({
+    id: 123123,
+    first_name: &#x27;mosh&#x27;,
+    last_name: &#x27;israeli&#x27;,
+    birthday: new Date(&#x27;1990-01-01&#x27;)
+  });
+});
+
+after(async () =&gt; {
+  await mongoose.disconnect();
+  await mongod.stop();
+});
+
+describe(&#x27;costs-service&#x27;, () =&gt; {
+  it(&#x27;rejects negative sum with specific message&#x27;, async () =&gt; {
+    const res = await request(app)
+      .post(&#x27;/api/add&#x27;)
+      .send({ userid: 123123, description: &#x27;x&#x27;, category: &#x27;food&#x27;, sum: -1 });
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(res.body.message, &#x27;cost cannot be negative number&#x27;);
+  });
+
+  it(&#x27;adds cost and builds report&#x27;, async () =&gt; {
+    const add = await request(app)
+      .post(&#x27;/api/add&#x27;)
+      .send({ userid: 123123, description: &#x27;milk&#x27;, category: &#x27;food&#x27;, sum: 8 });
+    assert.strictEqual(add.status, 201);
+    const now = new Date();
+    const res = await request(app).get(&#x27;/api/report&#x27;).query({
+      id: 123123,
+      year: now.getFullYear(),
+      month: now.getMonth() + 1
+    });
+    assert.strictEqual(res.status, 200);
+    assert.ok(Array.isArray(res.body.costs));
+  });
+});
+</pre>
+<div class="file-title">FILE: services/costs-service/utils/db.js</div>
+<pre>const mongoose = require(&#x27;mongoose&#x27;);
+const path = require(&#x27;path&#x27;);
+const fs = require(&#x27;fs&#x27;);
+
+function resolveMongoUri() {
+  if (process.env.MONGODB_URI) {
+    return process.env.MONGODB_URI;
+  }
+  const file = path.join(__dirname, &#x27;..&#x27;, &#x27;..&#x27;, &#x27;..&#x27;, &#x27;.mongo-uri&#x27;);
+  if (fs.existsSync(file)) {
+    return fs.readFileSync(file, &#x27;utf8&#x27;).trim();
+  }
+  return &#x27;mongodb://127.0.0.1:27017/cost_manager&#x27;;
+}
+
+async function connectDb() {
+  await mongoose.connect(resolveMongoUri());
+}
+
+module.exports = { connectDb };
+</pre>
+<div class="file-title">FILE: services/costs-service/utils/errors.js</div>
+<pre>function sendError(res, statusCode, id, message) {
+  return res.status(statusCode).json({ id, message });
+}
+
+module.exports = { sendError };
+</pre>
+<div class="file-title">FILE: services/costs-service/utils/reportBuilder.js</div>
+<pre>const VALID_CATEGORIES = [&#x27;food&#x27;, &#x27;health&#x27;, &#x27;housing&#x27;, &#x27;sports&#x27;, &#x27;education&#x27;];
+
+/*
+ * Builds the monthly report JSON in the format required by the course document.
+ * Report category keys use &quot;Sport&quot; (capital S) for the sports bucket in output.
+ */
+function buildReport(userid, year, month, costDocuments) {
+  const grouped = {
+    food: [],
+    education: [],
+    health: [],
+    housing: [],
+    Sport: []
+  };
+
+  costDocuments.forEach((cost) =&gt; {
+    const day = new Date(cost.created_at).getDate();
+    const entry = {
+      sum: cost.sum,
+      description: cost.description,
+      day
+    };
+    if (cost.category === &#x27;food&#x27;) {
+      grouped.food.push(entry);
+    } else if (cost.category === &#x27;education&#x27;) {
+      grouped.education.push(entry);
+    } else if (cost.category === &#x27;health&#x27;) {
+      grouped.health.push(entry);
+    } else if (cost.category === &#x27;housing&#x27;) {
+      grouped.housing.push(entry);
+    } else if (cost.category === &#x27;sports&#x27;) {
+      grouped.Sport.push(entry);
+    }
+  });
+
+  return {
+    userid: Number(userid),
+    year: Number(year),
+    month: Number(month),
+    costs: [
+      { food: grouped.food },
+      { education: grouped.education },
+      { health: grouped.health },
+      { housing: grouped.housing },
+      { Sport: grouped.Sport }
+    ]
+  };
+}
+
+function isPastMonth(year, month) {
+  const now = new Date();
+  const y = Number(year);
+  const m = Number(month);
+  if (y &lt; now.getFullYear()) {
+    return true;
+  }
+  if (y === now.getFullYear() &amp;&amp; m &lt; now.getMonth() + 1) {
+    return true;
+  }
+  return false;
+}
+
+module.exports = { buildReport, isPastMonth, VALID_CATEGORIES };
+</pre>
+<div class="file-title">FILE: services/costs-service/utils/requestLogger.js</div>
+<pre>const pino = require(&#x27;pino&#x27;);
+const Log = require(&#x27;../models/logs&#x27;);
+
+const logger = pino({ level: &#x27;info&#x27; });
+
+async function saveLog(entry) {
+  try {
+    await Log.create(entry);
+  } catch (err) {
+    logger.error({ err }, &#x27;failed to save log&#x27;);
+  }
+}
+
+function requestLogger(serviceName) {
+  return function logMiddleware(req, res, next) {
+    saveLog({
+      level: &#x27;info&#x27;,
+      message: `HTTP request received on ${serviceName}`,
+      method: req.method,
+      url: req.originalUrl,
+      endpoint: req.path,
+      time: new Date()
+    });
+    next();
+  };
+}
+
+async function logEndpointAccess(serviceName, endpointName) {
+  await saveLog({
+    level: &#x27;info&#x27;,
+    message: `Endpoint accessed: ${endpointName} on ${serviceName}`,
+    endpoint: endpointName,
+    time: new Date()
+  });
+}
+
+module.exports = { requestLogger, logEndpointAccess };
+</pre>
+<div class="file-title">FILE: services/costs-service/utils/validateCost.js</div>
+<pre>const VALID_CATEGORIES = [&#x27;food&#x27;, &#x27;health&#x27;, &#x27;housing&#x27;, &#x27;sports&#x27;, &#x27;education&#x27;];
+
+function validateAddCost(body) {
+  if (body.userid === undefined || body.userid === null || body.userid === &#x27;&#x27;) {
+    return { id: 10, message: &#x27;userid is required&#x27; };
+  }
+  if (Number.isNaN(Number(body.userid))) {
+    return { id: 11, message: &#x27;userid must be a number&#x27; };
+  }
+  if (!body.description || String(body.description).trim() === &#x27;&#x27;) {
+    return { id: 12, message: &#x27;description is required&#x27; };
+  }
+  if (!body.category || String(body.category).trim() === &#x27;&#x27;) {
+    return { id: 13, message: &#x27;category is required&#x27; };
+  }
+  if (!VALID_CATEGORIES.includes(body.category)) {
+    return {
+      id: 14,
+      message: `category must be one of: ${VALID_CATEGORIES.join(&#x27;, &#x27;)}`
+    };
+  }
+  if (body.sum === undefined || body.sum === null || body.sum === &#x27;&#x27;) {
+    return { id: 15, message: &#x27;sum is required&#x27; };
+  }
+  if (Number.isNaN(Number(body.sum))) {
+    return { id: 16, message: &#x27;sum must be a number&#x27; };
+  }
+  if (Number(body.sum) &lt; 0) {
+    return { id: 17, message: &#x27;cost cannot be negative number&#x27; };
+  }
+  if (body.created_at) {
+    const created = new Date(body.created_at);
+    if (Number.isNaN(created.getTime())) {
+      return { id: 18, message: &#x27;created_at is invalid&#x27; };
+    }
+    if (isDateInPast(created)) {
+      return { id: 19, message: &#x27;cannot add cost with date in the past&#x27; };
+    }
+  }
+  return null;
+}
+
+function isDateInPast(date) {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return date &lt; startOfToday;
+}
+
+function validateReportQuery(query) {
+  if (!query.id || query.id === &#x27;&#x27;) {
+    return { id: 20, message: &#x27;id is required&#x27; };
+  }
+  if (!query.year || query.year === &#x27;&#x27;) {
+    return { id: 21, message: &#x27;year is required&#x27; };
+  }
+  if (!query.month || query.month === &#x27;&#x27;) {
+    return { id: 22, message: &#x27;month is required&#x27; };
+  }
+  if (Number.isNaN(Number(query.id))) {
+    return { id: 23, message: &#x27;id must be a number&#x27; };
+  }
+  if (Number.isNaN(Number(query.year))) {
+    return { id: 24, message: &#x27;year must be a number&#x27; };
+  }
+  if (Number.isNaN(Number(query.month))) {
+    return { id: 25, message: &#x27;month must be a number&#x27; };
+  }
+  return null;
+}
+
+module.exports = {
+  validateAddCost,
+  validateReportQuery,
+  VALID_CATEGORIES,
+  isDateInPast
+};
+</pre>
+<div class="file-title">FILE: services/logs-service/app-bootstrap.js</div>
+<pre>const { connectDb } = require(&#x27;./utils/db&#x27;);
+
+let initialized = false;
+
+async function initApp() {
+  if (!initialized) {
+    await connectDb();
+    initialized = true;
+  }
+}
+
+module.exports = { initApp };
+</pre>
+<div class="file-title">FILE: services/logs-service/app.js</div>
+<pre>const { loadRootEnv } = require(&#x27;../../load-root-env&#x27;);
+loadRootEnv();
+const express = require(&#x27;express&#x27;);
+const Log = require(&#x27;./models/logs&#x27;);
+const { connectDb } = require(&#x27;./utils/db&#x27;);
+const { sendError } = require(&#x27;./utils/errors&#x27;);
+const { requestLogger, logEndpointAccess } = require(&#x27;./utils/requestLogger&#x27;);
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+app.use(express.json());
+app.use(requestLogger(&#x27;logs-service&#x27;));
+
+app.get(&#x27;/api/logs&#x27;, async (req, res) =&gt; {
+  try {
+    await logEndpointAccess(&#x27;logs-service&#x27;, &#x27;/api/logs&#x27;);
+    const logs = await Log.find({}).sort({ time: 1 }).lean();
+    return res.json(logs);
+  } catch (err) {
+    return sendError(res, 500, 500, &#x27;failed to fetch logs&#x27;);
+  }
+});
+
+app.get(&#x27;/health&#x27;, (req, res) =&gt; {
+  res.json({ status: &#x27;ok&#x27;, service: &#x27;logs-service&#x27; });
+});
+
+const { initApp } = require(&#x27;./app-bootstrap&#x27;);
+
+async function start() {
+  await initApp();
+  app.listen(PORT, () =&gt; {
+    console.log(`logs-service listening on port ${PORT}`);
+  });
+}
+
+if (require.main === module) {
+  start().catch((err) =&gt; {
+    console.error(err);
+    process.exit(1);
+  });
+}
+
+module.exports = app;
+module.exports.initApp = require(&#x27;./app-bootstrap&#x27;).initApp;
+</pre>
+<div class="file-title">FILE: services/logs-service/models/logs.js</div>
+<pre>const mongoose = require(&#x27;mongoose&#x27;);
+
+// Schema for HTTP and endpoint log entries stored in MongoDB.
+const logsSchema = new mongoose.Schema({
+  level: { type: String, required: true },
+  message: { type: String, required: true },
+  method: { type: String },
+  url: { type: String },
+  endpoint: { type: String },
+  time: { type: Date, default: Date.now }
+});
+
+module.exports = mongoose.model(&#x27;logs&#x27;, logsSchema);
+</pre>
+<div class="file-title">FILE: services/logs-service/tests/logs.test.js</div>
+<pre>const { describe, it, before, after } = require(&#x27;node:test&#x27;);
+const assert = require(&#x27;node:assert&#x27;);
+const request = require(&#x27;supertest&#x27;);
+const mongoose = require(&#x27;mongoose&#x27;);
+const { MongoMemoryServer } = require(&#x27;mongodb-memory-server&#x27;);
+
+let mongod;
+let app;
+
+before(async () =&gt; {
+  mongod = await MongoMemoryServer.create();
+  process.env.MONGODB_URI = mongod.getUri(&#x27;cost_manager&#x27;);
+  mongoose.models = {};
+  mongoose.modelSchemas = {};
+  delete require.cache[require.resolve(&#x27;../app&#x27;)];
+  const mod = require(&#x27;../app&#x27;);
+  await mod.initApp();
+  app = mod;
+});
+
+after(async () =&gt; {
+  await mongoose.disconnect();
+  await mongod.stop();
+});
+
+describe(&#x27;logs-service&#x27;, () =&gt; {
+  it(&#x27;returns logs array&#x27;, async () =&gt; {
+    await request(app).get(&#x27;/api/logs&#x27;);
+    const res = await request(app).get(&#x27;/api/logs&#x27;);
+    assert.strictEqual(res.status, 200);
+    assert.ok(Array.isArray(res.body));
+  });
+});
+</pre>
+<div class="file-title">FILE: services/logs-service/utils/db.js</div>
+<pre>const mongoose = require(&#x27;mongoose&#x27;);
+const path = require(&#x27;path&#x27;);
+const fs = require(&#x27;fs&#x27;);
+
+function resolveMongoUri() {
+  if (process.env.MONGODB_URI) {
+    return process.env.MONGODB_URI;
+  }
+  const file = path.join(__dirname, &#x27;..&#x27;, &#x27;..&#x27;, &#x27;..&#x27;, &#x27;.mongo-uri&#x27;);
+  if (fs.existsSync(file)) {
+    return fs.readFileSync(file, &#x27;utf8&#x27;).trim();
+  }
+  return &#x27;mongodb://127.0.0.1:27017/cost_manager&#x27;;
+}
+
+async function connectDb() {
+  const uri = resolveMongoUri();
+  await mongoose.connect(uri);
+  return uri;
+}
+
+module.exports = { connectDb, resolveMongoUri };
+</pre>
+<div class="file-title">FILE: services/logs-service/utils/errors.js</div>
+<pre>function sendError(res, statusCode, id, message) {
+  return res.status(statusCode).json({ id, message });
+}
+
+module.exports = { sendError };
+</pre>
+<div class="file-title">FILE: services/logs-service/utils/requestLogger.js</div>
+<pre>const pino = require(&#x27;pino&#x27;);
+const Log = require(&#x27;../models/logs&#x27;);
+
+const logger = pino({ level: &#x27;info&#x27; });
+
+async function saveLog(entry) {
+  try {
+    await Log.create(entry);
+  } catch (err) {
+    logger.error({ err }, &#x27;failed to save log to database&#x27;);
+  }
+}
+
+function requestLogger(serviceName) {
+  return function logMiddleware(req, res, next) {
+    const base = {
+      level: &#x27;info&#x27;,
+      method: req.method,
+      url: req.originalUrl,
+      time: new Date()
+    };
+
+    saveLog({
+      ...base,
+      message: `HTTP request received on ${serviceName}`,
+      endpoint: req.path
+    });
+
+    res.on(&#x27;finish&#x27;, () =&gt; {
+      saveLog({
+        ...base,
+        message: `HTTP response ${res.statusCode} on ${serviceName}`,
+        endpoint: req.path
+      });
+    });
+
+    next();
+  };
+}
+
+function logEndpointAccess(serviceName, endpointName) {
+  return saveLog({
+    level: &#x27;info&#x27;,
+    message: `Endpoint accessed: ${endpointName}`,
+    endpoint: endpointName,
+    time: new Date()
+  });
+}
+
+module.exports = { requestLogger, logEndpointAccess, logger };
+</pre>
+<div class="file-title">FILE: services/users-service/app-bootstrap.js</div>
+<pre>const { connectDb } = require(&#x27;./utils/db&#x27;);
+
+let initialized = false;
+
+async function initApp() {
+  if (!initialized) {
+    await connectDb();
+    initialized = true;
+  }
+}
+
+module.exports = { initApp };
+</pre>
+<div class="file-title">FILE: services/users-service/app.js</div>
+<pre>const { loadRootEnv } = require(&#x27;../../load-root-env&#x27;);
+loadRootEnv();
+const express = require(&#x27;express&#x27;);
+const User = require(&#x27;./models/users&#x27;);
+const Cost = require(&#x27;./models/costs&#x27;);
+const { connectDb } = require(&#x27;./utils/db&#x27;);
+const { sendError } = require(&#x27;./utils/errors&#x27;);
+const { requestLogger, logEndpointAccess } = require(&#x27;./utils/requestLogger&#x27;);
+const { validateAddUser } = require(&#x27;./utils/validateUser&#x27;);
+
+const app = express();
+const PORT = process.env.PORT || 3002;
+
+app.use(express.json());
+app.use(requestLogger(&#x27;users-service&#x27;));
+
+app.get(&#x27;/api/users&#x27;, async (req, res) =&gt; {
+  try {
+    await logEndpointAccess(&#x27;users-service&#x27;, &#x27;/api/users&#x27;);
+    const users = await User.find({}).lean();
+    return res.json(users);
+  } catch (err) {
+    return sendError(res, 500, 500, &#x27;failed to list users&#x27;);
+  }
+});
+
+app.get(&#x27;/api/users/:id&#x27;, async (req, res) =&gt; {
+  try {
+    await logEndpointAccess(&#x27;users-service&#x27;, &#x27;/api/users/:id&#x27;);
+    const userId = Number(req.params.id);
+    if (Number.isNaN(userId)) {
+      return sendError(res, 400, 7, &#x27;id must be a number&#x27;);
+    }
+
+    const user = await User.findOne({ id: userId }).lean();
+    if (!user) {
+      return sendError(res, 404, 8, `user with id ${userId} does not exist`);
+    }
+
+    const costs = await Cost.find({ userid: userId }).lean();
+    const total = costs.reduce((sum, item) =&gt; sum + item.sum, 0);
+
+    return res.json({
+      id: user.id,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      total
+    });
+  } catch (err) {
+    return sendError(res, 500, 500, &#x27;failed to get user details&#x27;);
+  }
+});
+
+app.post([&#x27;/api/add&#x27;, &#x27;/api/add/&#x27;], async (req, res) =&gt; {
+  try {
+    await logEndpointAccess(&#x27;users-service&#x27;, &#x27;/api/add&#x27;);
+    const validationError = validateAddUser(req.body);
+    if (validationError) {
+      return sendError(res, 400, validationError.id, validationError.message);
+    }
+
+    const existing = await User.findOne({ id: Number(req.body.id) });
+    if (existing) {
+      return sendError(res, 409, 9, `user with id ${req.body.id} already exists`);
+    }
+
+    const user = await User.create({
+      id: Number(req.body.id),
+      first_name: req.body.first_name,
+      last_name: req.body.last_name,
+      birthday: new Date(req.body.birthday)
+    });
+
+    return res.status(201).json({
+      id: user.id,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      birthday: user.birthday
+    });
+  } catch (err) {
+    return sendError(res, 500, 500, &#x27;failed to add user&#x27;);
+  }
+});
+
+app.get(&#x27;/health&#x27;, (req, res) =&gt; {
+  res.json({ status: &#x27;ok&#x27;, service: &#x27;users-service&#x27; });
+});
+
+const { initApp } = require(&#x27;./app-bootstrap&#x27;);
+
+async function start() {
+  await initApp();
+  app.listen(PORT, () =&gt; {
+    console.log(`users-service listening on port ${PORT}`);
+  });
+}
+
+if (require.main === module) {
+  start().catch((err) =&gt; {
+    console.error(err);
+    process.exit(1);
+  });
+}
+
+module.exports = app;
+module.exports.initApp = require(&#x27;./app-bootstrap&#x27;).initApp;
+</pre>
+<div class="file-title">FILE: services/users-service/models/costs.js</div>
+<pre>const mongoose = require(&#x27;mongoose&#x27;);
+
+const costsSchema = new mongoose.Schema({
+  description: { type: String, required: true },
+  category: { type: String, required: true },
+  userid: { type: Number, required: true },
+  sum: { type: Number, required: true },
+  created_at: { type: Date, default: Date.now }
+});
+
+module.exports = mongoose.model(&#x27;costs&#x27;, costsSchema);
+</pre>
+<div class="file-title">FILE: services/users-service/models/logs.js</div>
+<pre>const mongoose = require(&#x27;mongoose&#x27;);
+
+const logsSchema = new mongoose.Schema({
+  level: { type: String, required: true },
+  message: { type: String, required: true },
+  method: { type: String },
+  url: { type: String },
+  endpoint: { type: String },
+  time: { type: Date, default: Date.now }
+});
+
+module.exports = mongoose.model(&#x27;logs&#x27;, logsSchema);
+</pre>
+<div class="file-title">FILE: services/users-service/models/users.js</div>
+<pre>const mongoose = require(&#x27;mongoose&#x27;);
+
+const usersSchema = new mongoose.Schema({
+  id: { type: Number, required: true, unique: true },
+  first_name: { type: String, required: true },
+  last_name: { type: String, required: true },
+  birthday: { type: Date, required: true }
+});
+
+module.exports = mongoose.model(&#x27;users&#x27;, usersSchema);
+</pre>
+<div class="file-title">FILE: services/users-service/tests/users.test.js</div>
+<pre>const { describe, it, before, after } = require(&#x27;node:test&#x27;);
+const assert = require(&#x27;node:assert&#x27;);
+const request = require(&#x27;supertest&#x27;);
+const mongoose = require(&#x27;mongoose&#x27;);
+const { MongoMemoryServer } = require(&#x27;mongodb-memory-server&#x27;);
+
+let mongod;
+let app;
+
+before(async () =&gt; {
+  mongod = await MongoMemoryServer.create();
+  process.env.MONGODB_URI = mongod.getUri(&#x27;cost_manager&#x27;);
+  mongoose.models = {};
+  mongoose.modelSchemas = {};
+  delete require.cache[require.resolve(&#x27;../app&#x27;)];
+  const mod = require(&#x27;../app&#x27;);
+  await mod.initApp();
+  app = mod;
+});
+
+after(async () =&gt; {
+  await mongoose.disconnect();
+  await mongod.stop();
+});
+
+describe(&#x27;users-service&#x27;, () =&gt; {
+  it(&#x27;rejects missing birthday with specific message&#x27;, async () =&gt; {
+    const res = await request(app)
+      .post(&#x27;/api/add&#x27;)
+      .send({ id: 1, first_name: &#x27;a&#x27;, last_name: &#x27;b&#x27; });
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(res.body.message, &#x27;birthday is required&#x27;);
+  });
+
+  it(&#x27;adds and fetches user&#x27;, async () =&gt; {
+    await request(app).post(&#x27;/api/add&#x27;).send({
+      id: 99,
+      first_name: &#x27;test&#x27;,
+      last_name: &#x27;user&#x27;,
+      birthday: &#x27;2000-05-05&#x27;
+    });
+    const res = await request(app).get(&#x27;/api/users/99&#x27;);
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.first_name, &#x27;test&#x27;);
+  });
+});
+</pre>
+<div class="file-title">FILE: services/users-service/utils/db.js</div>
+<pre>const mongoose = require(&#x27;mongoose&#x27;);
+const path = require(&#x27;path&#x27;);
+const fs = require(&#x27;fs&#x27;);
+
+function resolveMongoUri() {
+  if (process.env.MONGODB_URI) {
+    return process.env.MONGODB_URI;
+  }
+  const file = path.join(__dirname, &#x27;..&#x27;, &#x27;..&#x27;, &#x27;..&#x27;, &#x27;.mongo-uri&#x27;);
+  if (fs.existsSync(file)) {
+    return fs.readFileSync(file, &#x27;utf8&#x27;).trim();
+  }
+  return &#x27;mongodb://127.0.0.1:27017/cost_manager&#x27;;
+}
+
+async function connectDb() {
+  await mongoose.connect(resolveMongoUri());
+}
+
+module.exports = { connectDb, resolveMongoUri };
+</pre>
+<div class="file-title">FILE: services/users-service/utils/errors.js</div>
+<pre>function sendError(res, statusCode, id, message) {
+  return res.status(statusCode).json({ id, message });
+}
+
+module.exports = { sendError };
+</pre>
+<div class="file-title">FILE: services/users-service/utils/requestLogger.js</div>
+<pre>const pino = require(&#x27;pino&#x27;);
+const Log = require(&#x27;../models/logs&#x27;);
+
+const logger = pino({ level: &#x27;info&#x27; });
+
+async function saveLog(entry) {
+  try {
+    await Log.create(entry);
+  } catch (err) {
+    logger.error({ err }, &#x27;failed to save log&#x27;);
+  }
+}
+
+function requestLogger(serviceName) {
+  return function logMiddleware(req, res, next) {
+    saveLog({
+      level: &#x27;info&#x27;,
+      message: `HTTP request received on ${serviceName}`,
+      method: req.method,
+      url: req.originalUrl,
+      endpoint: req.path,
+      time: new Date()
+    });
+    next();
+  };
+}
+
+async function logEndpointAccess(serviceName, endpointName) {
+  await saveLog({
+    level: &#x27;info&#x27;,
+    message: `Endpoint accessed: ${endpointName} on ${serviceName}`,
+    endpoint: endpointName,
+    time: new Date()
+  });
+}
+
+module.exports = { requestLogger, logEndpointAccess };
+</pre>
+<div class="file-title">FILE: services/users-service/utils/validateUser.js</div>
+<pre>const VALID_CATEGORIES = [&#x27;food&#x27;, &#x27;health&#x27;, &#x27;housing&#x27;, &#x27;sports&#x27;, &#x27;education&#x27;];
+
+function validateAddUser(body) {
+  if (body.id === undefined || body.id === null || body.id === &#x27;&#x27;) {
+    return { id: 1, message: &#x27;id is required&#x27; };
+  }
+  if (Number.isNaN(Number(body.id))) {
+    return { id: 2, message: &#x27;id must be a number&#x27; };
+  }
+  if (!body.first_name || String(body.first_name).trim() === &#x27;&#x27;) {
+    return { id: 3, message: &#x27;first_name is required&#x27; };
+  }
+  if (!body.last_name || String(body.last_name).trim() === &#x27;&#x27;) {
+    return { id: 4, message: &#x27;last_name is required&#x27; };
+  }
+  if (body.birthday === undefined || body.birthday === null || body.birthday === &#x27;&#x27;) {
+    return { id: 5, message: &#x27;birthday is required&#x27; };
+  }
+  const birthday = new Date(body.birthday);
+  if (Number.isNaN(birthday.getTime())) {
+    return { id: 6, message: &#x27;birthday is invalid&#x27; };
+  }
+  return null;
+}
+
+module.exports = { validateAddUser, VALID_CATEGORIES };
+</pre>
+</body></html>

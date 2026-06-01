@@ -1,0 +1,28 @@
+איך להפוך את הקובץ ל-PDF להגשה (arielle_malka.pdf)
+================================================
+
+1. משכי מהגיט את התיקייה submission/ (אחרי git pull)
+   או העתיקי את הקובץ:
+   submission/arielle_malka_SUBMISSION.html
+
+2. פתיחה ב-Microsoft Word:
+   - לחיצה ימנית על arielle_malka_SUBMISSION.html
+   - Open with → Microsoft Word
+   (או Word → File → Open → בחרי את הקובץ)
+
+3. מלאי עמודת "נייד" בטבלת חברי הצוות (אם צריך)
+
+4. וודאי שהלינק ליוטיוב לחיץ:
+   https://youtu.be/ZuppCvTG9pc
+
+5. שמירה כ-PDF:
+   File → Save As → PDF
+   שם הקובץ: arielle_malka.pdf
+   (אותיות קטנות בלבד)
+
+6. Moodle:
+   - העלי arielle_malka.pdf
+   - העלי ZIP של הפרויקט (בלי node_modules, בלי .env)
+   - שתי קבצים נפרדים, לא בתוך ZIP אחד
+
+הערה: הקובץ כולל עמוד פתיחה + כל קוד ה-JavaScript לפי דרישות המרצה.
