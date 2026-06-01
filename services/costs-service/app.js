@@ -1,5 +1,4 @@
-const { loadRootEnv } = require('../../load-root-env');
-loadRootEnv();
+require('dotenv').config();
 const express = require('express');
 const User = require('./models/users');
 const Cost = require('./models/costs');

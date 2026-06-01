@@ -1,5 +1,4 @@
-const { loadRootEnv } = require('../../load-root-env');
-loadRootEnv();
+require('dotenv').config();
 const express = require('express');
 const { connectDb } = require('./utils/db');
 const { sendError } = require('./utils/errors');

@@ -1,10 +1,7 @@
 /* Starts all four microservices (requires MongoDB URI). */
 const { spawn } = require('child_process');
 const path = require('path');
-const { loadRootEnv } = require('../load-root-env');
 const { getMongoUri } = require('./get-mongo-uri');
-
-loadRootEnv();
 
 const services = [
   { name: 'logs', dir: 'logs-service', port: process.env.LOGS_PORT || 3001 },
@@ -13,7 +10,7 @@ const services = [
   { name: 'about', dir: 'about-service', port: process.env.ABOUT_PORT || 3004 }
 ];
 
-const mongoUri = process.env.MONGODB_URI || getMongoUri();
+const mongoUri = getMongoUri();
 const children = [];
 
 function startService(service) {
