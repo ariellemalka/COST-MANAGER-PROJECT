@@ -41,6 +41,8 @@ npm test
 
 ## Environment variables
 
+Use **one** `.env` file at the **project root** (next to `package.json`). All four services load it automatically — you do **not** need separate `.env` files under `services/`.
+
 Copy `.env.example` to `.env`:
 
 - `MONGODB_URI` — MongoDB Atlas connection string

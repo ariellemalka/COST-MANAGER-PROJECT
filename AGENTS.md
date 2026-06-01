@@ -30,6 +30,8 @@ See `README.md` for Render/Atlas deployment.
 
 ### Gotchas
 
+- **Single root `.env`:** All services use `load-root-env.js` at the repo root. Edit `TEAM_MEMBERS` there only; restart `npm run start:all` after changes.
+
 - **Four processes required** — not one Express app with four route groups.
 - **`POST /api/add`** exists on both users-service and costs-service (different hosts).
 - Report JSON uses **`Sport`** (capital S) for the sports category bucket.
