@@ -1,0 +1,20 @@
+{
+  "name": "cost-manager-project",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cost Manager RESTful Web Services \u2014 four separate processes",
+  "scripts": {
+    "install:all": "npm install && npm install --prefix services/logs-service && npm install --prefix services/users-service && npm install --prefix services/costs-service && npm install --prefix services/about-service",
+    "start:mongo": "node scripts/start-mongo.js",
+    "seed": "node scripts/seed.js",
+    "start:all": "node scripts/start-all.js",
+    "test": "npm run test --prefix services/users-service && npm run test --prefix services/costs-service && npm run test --prefix services/about-service && npm run test --prefix services/logs-service"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^10.1.4"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "mongoose": "^8.9.3"
+  }
+}
