@@ -1,5 +1,6 @@
 /* Seeds the imaginary submission user (id 123123). */
-require('dotenv').config();
+const { loadRootEnv } = require('../load-root-env');
+loadRootEnv();
 const mongoose = require('mongoose');
 const { getMongoUri } = require('./get-mongo-uri');
 
